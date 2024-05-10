@@ -44,14 +44,12 @@
 #endif
 
 #include "flash_api.h"
-#include <device_lock.h>
 #include "platform_stdlib.h"
-#include "platform_opts_np.h"
-#include "aws_clientcredential.h"
+#include "amazon/example_amazon_freertos.h"
 
 #define pkcs11OBJECT_CERTIFICATE_MAX_SIZE    4096
 #define pkcs11OBJECT_FLASH_CERT_PRESENT      ( 0x22ABCDEFuL ) //magic number for check flash data
-#if 0 // move to platform_opts_np.h
+#if 0 // move to example_amazon_freertos.h
 #define pkcs11OBJECT_CERT_FLASH_OFFSET       ( 0x1DC000 ) //Flash location for CERT
 #define pkcs11OBJECT_PRIV_KEY_FLASH_OFFSET   ( 0x1DD000 ) //Flash location for Priv Key
 #define pkcs11OBJECT_PUB_KEY_FLASH_OFFSET    ( 0x1DE000 ) //Flash location for Pub Key
@@ -61,6 +59,7 @@
  * Flash Format
  * | Flash Mark(4) | checksum(4) | DataLen(4) |  Data |
  */
+#define FLASH_SECTOR_SIZE      0x1000
 #define FLASH_CHECKSUM_OFFSET  4
 #define FLASH_DATALEN_OFFSET   8
 #define FLASH_DATA_OFFSET     12
@@ -162,14 +161,13 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject( CK_ATTRIBUTE_PTR pxLabel,
 			ulCheckSum = 0;
 			for( i = 0; i < xBytesWritten; i++)
 				ulCheckSum += pucData[i];
-			device_mutex_lock(RT_DEV_LOCK_FLASH);
+
 			flash_erase_sector(&flash, pcFlashAddr);
 			flash_write_word(&flash, pcFlashAddr, ulFlashMark);
 			flash_write_word(&flash, pcFlashAddr + FLASH_CHECKSUM_OFFSET, ulCheckSum);
 			flash_write_word(&flash, pcFlashAddr + FLASH_DATALEN_OFFSET, xBytesWritten);
 			flash_stream_write(&flash, pcFlashAddr + FLASH_DATA_OFFSET, xBytesWritten, pucData);
 			flash_write_word(&flash, pcFlashAddr + FLASH_DATA_OFFSET + xBytesWritten, 0x0); // include '\0'
-			device_mutex_unlock(RT_DEV_LOCK_FLASH);
 		}
 	}
     return xHandle;
@@ -193,7 +191,7 @@ CK_OBJECT_HANDLE PKCS11_PAL_FindObject( CK_BYTE_PTR pxLabel,
 {
 	/* Avoid compiler warnings about unused variables. */
 	( void ) usLength;
-	
+
     CK_OBJECT_HANDLE xHandle = 0;
 	uint32_t pcFlashAddr = 0;
 	flash_t flash;
@@ -205,14 +203,12 @@ CK_OBJECT_HANDLE PKCS11_PAL_FindObject( CK_BYTE_PTR pxLabel,
 	/* Check if object exists/has been created before returning. */
 	if(xHandle != eInvalidHandle)
 	{
-		device_mutex_lock(RT_DEV_LOCK_FLASH);
 		flash_read_word(&flash, pcFlashAddr, &ulFlashMark);
 		if( ulFlashMark != pkcs11OBJECT_FLASH_CERT_PRESENT ){
 			xHandle = eInvalidHandle;
 		}
-		device_mutex_unlock(RT_DEV_LOCK_FLASH);
 	}
-		
+
     return xHandle;
 }
 
@@ -275,8 +271,6 @@ CK_RV PKCS11_PAL_GetObjectValue( CK_OBJECT_HANDLE xHandle,
 			break;
     }
 
-    device_mutex_lock(RT_DEV_LOCK_FLASH);
-
 	if( pcFlashAddr != 0 )
 	{
 		flash_read_word(&flash, pcFlashAddr, &ulFlashMark);
@@ -310,7 +304,6 @@ CK_RV PKCS11_PAL_GetObjectValue( CK_OBJECT_HANDLE xHandle,
 	}
 
 exit:
-	device_mutex_unlock(RT_DEV_LOCK_FLASH);
     return xReturn;
 }
 
@@ -421,15 +414,15 @@ CK_RV PKCS11_PAL_DestroyObject( CK_OBJECT_HANDLE xHandle )
 }
 
 #if defined(MBEDTLS_ENTROPY_HARDWARE_ALT)
-extern int rtw_get_random_bytes(void* dst, u32 size);
+extern int TRNG_get_random_bytes(void* dst, u32 size);
 int mbedtls_hardware_poll( void * data,
                            unsigned char * output,
                            size_t len,
                            size_t * olen )
 {
-    rtw_get_random_bytes(output, len);
+    TRNG_get_random_bytes(output, len);
     *olen = len;
-	
+
     return 0;
 }
 #endif

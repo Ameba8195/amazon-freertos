@@ -30,10 +30,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "ota_config.h"
 #include "iot_crypto.h"
 #include "core_pkcs11.h"
-#include "platform_opts_np.h"
-#include "osdep_service.h"
+#include "amazon/example_amazon_freertos.h"
 #include "flash_api.h"
-#include <device_lock.h>
+#include "ameba_ota.h"
 #include "platform_stdlib.h"
 
 #define OTA_MEMDUMP 0
@@ -49,7 +48,7 @@ update_manifest_info aws_manifest;
 static bool aws_manifest_get = false;
 
 
-#if 0 // move to platform_opts_np.h
+#if 0 // move to example_amazon_freertos.h
 #define AWS_OTA_IMAGE_STATE_FLASH_OFFSET             ( 0x1DB000 )
 #endif
 #define AWS_OTA_IMAGE_STATE_FLAG_IMG_NEW             0xffffffffU /* 11111111b A new image that hasn't yet been run. */
@@ -208,13 +207,11 @@ bool prvPAL_CreateFileForRx_rtl8721d(OtaFileContext_t *C)
         memset((void *)&aws_ota_target_hdr, 0, sizeof(update_ota_target_hdr));
         memset((void *)&aws_manifest, 0, sizeof(update_manifest_info));
 
-        device_mutex_lock(RT_DEV_LOCK_FLASH);
         for( i = 0; i < block_cnt; i++)
         {
             OTA_PRINT("[OTA] Erase block @ 0x%x\n", ota_ctx.lFileHandle - SPI_FLASH_BASE + i * (64 * 1024));
             flash_erase_block(&flash, aws_ota_imgaddr - SPI_FLASH_BASE + i * (64 * 1024));
         }
-        device_mutex_unlock(RT_DEV_LOCK_FLASH);
     }
     else {
         OTA_PRINT("[OTA] invalid ota addr (%d) \r\n", ota_ctx.lFileHandle);
@@ -280,7 +277,7 @@ static OtaPalStatus_t prvSignatureVerificationUpdate_rtl8721d(OtaFileContext_t *
       return OTA_PAL_COMBINE_ERR( mainErr, subErr );
     }
 
-    pTempbuf = rtw_malloc(BUF_SIZE);
+    pTempbuf = malloc(BUF_SIZE);
     if(!pTempbuf){
         mainErr = OtaPalSignatureCheckFailed;
         goto error;
@@ -300,59 +297,16 @@ static OtaPalStatus_t prvSignatureVerificationUpdate_rtl8721d(OtaFileContext_t *
     /* read flash data back to check signature of the image */
     for (i = 0; i < len; i += BUF_SIZE) {
         rlen = (len - i) > BUF_SIZE ? BUF_SIZE : (len - i);
-        device_mutex_lock(RT_DEV_LOCK_FLASH);
         flash_stream_read(&flash, addr - SPI_FLASH_BASE + i + sizeof(update_manifest_info), rlen, pTempbuf);
     #if OTA_MEMDUMP
         vMemDump(addr - SPI_FLASH_BASE + i + sizeof(update_manifest_info), pTempbuf, rlen, "PAYLOAD1");
     #endif
-        device_mutex_unlock(RT_DEV_LOCK_FLASH);
         CRYPTO_SignatureVerificationUpdate(pvContext, pTempbuf, rlen);
     }
-
-#if 0
-    /* read certificate first */
-    /* read flash data back to check signature of the image */
-    for(i=0; i < 0x1000; i += BUF_SIZE){
-        rlen = (0x1000 - i) > BUF_SIZE ? BUF_SIZE : (0x1000 - i);
-        device_mutex_lock(RT_DEV_LOCK_FLASH);
-        flash_stream_read(&flash, addr - SPI_FLASH_BASE+i, rlen, pTempbuf);
-        #if OTA_MEMDUMP
-        vMemDump(addr - SPI_FLASH_BASE+i, pTempbuf, rlen, "PAYLOAD1");
-        #endif
-        device_mutex_unlock(RT_DEV_LOCK_FLASH);
-        CRYPTO_SignatureVerificationUpdate(pvContext, pTempbuf, rlen);
-    }
-
-    /* read from Manifest */
-    len = len - 0x1000;
-    addr = addr + 0x1000;
-
-    memcpy(&aws_ota_target_hdr.Manifest[HdrIdx], &aws_manifest, sizeof(update_manifest_info));
-    /*add manifest */
-    CRYPTO_SignatureVerificationUpdate(pvContext, &aws_ota_target_hdr.Manifest[HdrIdx], sizeof(update_manifest_info));
-
-    printf("[%d]manifest\n",HdrIdx);
-    for (int i = 0; i < sizeof(update_manifest_info); i++) {
-        printf("0x%x ",*((u8 *)&aws_ota_target_hdr.Manifest[HdrIdx] + i));
-    }
-    printf("\n");
-
-    /* read flash data back to check signature of the image */
-    for (i = 0; i < len; i += BUF_SIZE) {
-        rlen = (len - i) > BUF_SIZE ? BUF_SIZE : (len - i);
-        device_mutex_lock(RT_DEV_LOCK_FLASH);
-        flash_stream_read(&flash, addr - SPI_FLASH_BASE + i + sizeof(update_manifest_info), rlen, pTempbuf);
-        #if OTA_MEMDUMP
-        vMemDump(addr - SPI_FLASH_BASE + i + sizeof(update_manifest_info), pTempbuf, rlen, "PAYLOAD1");
-        #endif
-        device_mutex_unlock(RT_DEV_LOCK_FLASH);
-        CRYPTO_SignatureVerificationUpdate(pvContext, pTempbuf, rlen);
-    }
-#endif
 
 error:
     if(pTempbuf)
-        rtw_free(pTempbuf);
+        free(pTempbuf);
 
     return OTA_PAL_COMBINE_ERR( mainErr, subErr );
 }
@@ -509,17 +463,14 @@ int32_t prvPAL_WriteBlock_rtl8721d(OtaFileContext_t *C, uint32_t ulOffset, uint8
              printf("\n");
         }
 
-        device_mutex_lock(RT_DEV_LOCK_FLASH);
         OTA_PRINT("[OTA] FIRST Write %d bytes @ 0x%x\n", byte_to_write, address);
         if(flash_stream_write(&flash, address, byte_to_write, pData) < 0){
             OTA_PRINT("[%s] Write sector failed\n", __FUNCTION__);
-            device_mutex_unlock(RT_DEV_LOCK_FLASH);
             return -1;
         }
 #if OTA_MEMDUMP
         vMemDump(address, pData, byte_to_write, "PAYLOAD1");
 #endif
-        device_mutex_unlock(RT_DEV_LOCK_FLASH);
         aws_ota_imgsz += byte_to_write;
         return ulBlockSize;
     }
@@ -550,17 +501,14 @@ int32_t prvPAL_WriteBlock_rtl8721d(OtaFileContext_t *C, uint32_t ulOffset, uint8
         OTA_PRINT("[OTA] LAST image data arrived %d\n", WriteLen);
     }
 
-    device_mutex_lock(RT_DEV_LOCK_FLASH);
     LogInfo( ("[OTA] Write %d bytes @ 0x%x \n", WriteLen, address + offset) );
     if(flash_stream_write(&flash, address + offset, WriteLen, pData) < 0){
         LogInfo( ("[%s] Write sector failed\n", __FUNCTION__) );
-        device_mutex_unlock(RT_DEV_LOCK_FLASH);
         return -1;
     }
 #if OTA_MEMDUMP
     vMemDump(address+offset, pData, ulBlockSize, "PAYLOAD2");
 #endif
-    device_mutex_unlock(RT_DEV_LOCK_FLASH);
     aws_ota_imgsz += WriteLen;
 
     return ulBlockSize;
@@ -573,22 +521,18 @@ OtaPalStatus_t prvPAL_ActivateNewImage_rtl8721d(void)
     OTA_PRINT("[OTA] FirmwareSize = %d, OtaTargetHdr.FileImgHdr.ImgLen = %d\n", aws_ota_imgsz, aws_ota_target_hdr.FileImgHdr[HdrIdx].ImgLen);
 
     /*------------- verify checksum and update signature-----------------*/
-    if(verify_ota_checksum_aws(&aws_ota_target_hdr, ota_target_index, 0/*header index*/)){
-        if(!ota_update_manifest_aws(&aws_ota_target_hdr, ota_target_index, 0/*header index*/)) {
+    if(verify_ota_checksum(&aws_ota_target_hdr, ota_target_index, 0/*header index*/)){
+        if(!ota_update_manifest(&aws_ota_target_hdr, ota_target_index, 0/*header index*/)) {
             OTA_PRINT("[OTA] [%s], change signature failed\r\n", __FUNCTION__);
             return OTA_PAL_COMBINE_ERR( OtaPalActivateFailed, 0 );
         } else {
-            device_mutex_lock(RT_DEV_LOCK_FLASH);
             flash_erase_sector(&flash, AWS_OTA_IMAGE_STATE_FLASH_OFFSET);
             flash_write_word(&flash, AWS_OTA_IMAGE_STATE_FLASH_OFFSET, AWS_OTA_IMAGE_STATE_FLAG_PENDING_COMMIT);
-            device_mutex_unlock(RT_DEV_LOCK_FLASH);
             OTA_PRINT("[OTA] [%s] Update OTA success!\r\n", __FUNCTION__);
         }
     }else{
         /*if checksum error, clear the signature zone which has been written in flash in case of boot from the wrong firmware*/
-        device_mutex_lock(RT_DEV_LOCK_FLASH);
         flash_erase_sector(&flash, aws_ota_imgaddr - SPI_FLASH_BASE);
-        device_mutex_unlock(RT_DEV_LOCK_FLASH);
         OTA_PRINT("[OTA] [%s] The checksume is wrong!\n\r", __FUNCTION__);
         return OTA_PAL_COMBINE_ERR( OtaPalActivateFailed, 0 );
     }
@@ -612,10 +556,8 @@ OtaPalStatus_t prvPAL_SetPlatformImageState_rtl8721d (OtaImageState_t eState)
 
 	if ((eState != OtaImageStateUnknown) && (eState <= OtaLastImageState)) {
 		/* write state to file */
-		device_mutex_lock(RT_DEV_LOCK_FLASH);
 		flash_erase_sector(&flash, AWS_OTA_IMAGE_STATE_FLASH_OFFSET);
 		flash_write_word(&flash, AWS_OTA_IMAGE_STATE_FLASH_OFFSET, eState);
-		device_mutex_unlock(RT_DEV_LOCK_FLASH);
 	} else { /* Image state invalid. */
 		LogError(("[%s] Invalid image state provided.", __FUNCTION__));
 		mainErr = OtaPalBadImageState;
@@ -630,9 +572,7 @@ OtaPalImageState_t prvPAL_GetPlatformImageState_rtl8721d( void )
     uint32_t eSavedAgentState  =  OtaImageStateUnknown;
     flash_t flash;
 
-    device_mutex_lock(RT_DEV_LOCK_FLASH);
     flash_read_word(&flash, AWS_OTA_IMAGE_STATE_FLASH_OFFSET, &eSavedAgentState );
-    device_mutex_unlock(RT_DEV_LOCK_FLASH);
 
     switch ( eSavedAgentState  )
     {

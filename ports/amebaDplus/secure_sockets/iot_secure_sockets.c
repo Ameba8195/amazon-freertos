@@ -35,8 +35,8 @@
 /* Socket and WiFi interface includes. */
 #include "iot_secure_sockets.h"
 
-#include "sockets.h"
-#include "netdb.h"
+#include "lwip/sockets.h"
+#include "lwip/netdb.h"
 #include "iot_wifi.h"
 #include "iot_tls.h"
 #include "FreeRTOSConfig.h"
@@ -654,7 +654,7 @@ int32_t SOCKETS_SetSockOpt( Socket_t xSocket,
             tv.tv_sec  = TICK_TO_S ( ticks );
             tv.tv_usec = TICK_TO_US( ticks % configTICK_RATE_HZ );
 
-            lwip_setsockopt( ctx->ip_socket,     //ret = 
+            lwip_setsockopt( ctx->ip_socket,     //ret =
                                    SOL_SOCKET,
                                    lOptionName == SOCKETS_SO_RCVTIMEO ? SO_RCVTIMEO : SO_SNDTIMEO,
                                    &ticks,    //( struct timeval * )&tv,
