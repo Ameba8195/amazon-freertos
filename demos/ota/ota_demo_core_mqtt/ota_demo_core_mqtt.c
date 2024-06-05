@@ -1903,15 +1903,13 @@ int RunOtaCoreMqttDemo( bool xAwsIotMqttMode,
     BaseType_t xMqttInitialized = pdFALSE;
 
     /* Wait for Networking */
-    if( wifi_is_connected_to_ap() != 0 /*RTW_SUCCESS*/ )
+    u8 *ip = LwIP_GetIP(0);
+    do
     {
+        ip = LwIP_GetIP(0);
         LogInfo( ( "Waiting for the network link up event..." ) );
-
-        while( wifi_is_connected_to_ap() != 0 /*RTW_SUCCESS*/ )
-        {
-            vTaskDelay( pdMS_TO_TICKS( 1000U ) );
-        }
-    }
+        vTaskDelay( pdMS_TO_TICKS( 2000U ) );
+    } while( wifi_is_connected_to_ap() != 0 || ip[0] == 0 );
 
     LogInfo( ( "OTA over MQTT demo, Application version %u.%u.%u",
                appFirmwareVersion.u.x.major,
