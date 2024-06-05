@@ -37,6 +37,7 @@
 #include "iot_wifi.h"
 #include "iot_crypto.h"
 #include "aws_clientcredential.h"
+#include "aws_clientcredential_keys.h"
 #include "core_pkcs11_config.h"
 
 /* Logging Task Defines. */
@@ -90,6 +91,15 @@ int aws_main( void )
     // handle keys with pkcs11
     vDevModeKeyProvisioning();
     #endif
+
+    uint8_t * pucClientPrivateKey = ( uint8_t * ) keyCLIENT_PRIVATE_KEY_PEM;
+    uint8_t * pucClientCertificate = ( uint8_t * ) keyCLIENT_CERTIFICATE_PEM;
+
+    if( pucClientPrivateKey == NULL || pucClientCertificate == NULL )
+    {
+        printf("AWS demo run failed. Please check setting in aws_clientcredential_keys.h\n");
+        return 0;
+    }
 
     //mqtt mutual auto demo
     RunCoreMqttMutualAuthDemo(0, NULL, NULL, NULL, NULL);
