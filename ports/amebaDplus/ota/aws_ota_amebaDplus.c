@@ -448,7 +448,7 @@ int32_t prvPAL_WriteBlock_rtl8721d(OtaFileContext_t *C, uint32_t ulOffset, uint8
 
         pData += (ulBlockSize - byte_to_write);
 
-        if(OTA_FILE_BLOCK_SIZE > 0x1000 && ulOffset == 0)
+        if(OTA_FILE_BLOCK_SIZE >= 0x1000 && ulOffset == 0)
         {
              OTA_PRINT("[OTA] manifest data arrived \n");
              //Save manifest
@@ -474,22 +474,6 @@ int32_t prvPAL_WriteBlock_rtl8721d(OtaFileContext_t *C, uint32_t ulOffset, uint8
         aws_ota_imgsz += byte_to_write;
         return ulBlockSize;
     }
-
-    // handle manifest
-    if(OTA_FILE_BLOCK_SIZE == 0x1000 && ulOffset == 0x1000)
-    {
-        OTA_PRINT("[OTA] manifest data arrived \n");
-        //Save manifest
-        memcpy(&aws_manifest, pData+aws_ota_target_hdr.FileImgHdr[HdrIdx].Offset, sizeof(update_manifest_info));
-        //Erase manifest for protect shutdown while ota downloading
-        memset(pData+aws_ota_target_hdr.FileImgHdr[HdrIdx].Offset, 0xff, sizeof(update_manifest_info));
-
-        printf("[%d]manifest\n",HdrIdx);
-        for (int i = 0; i < sizeof(update_manifest_info); i++) {
-            printf("0x%x ",*((u8 *)&aws_manifest + i));
-        }
-        printf("\n");
-   }
 
     WriteLen = ulBlockSize;
     offset = ulOffset - aws_ota_target_hdr.FileImgHdr[HdrIdx].Offset;
