@@ -616,6 +616,9 @@ int RunCoreMqttMutualAuthDemo( bool awsIotMqttMode,
                 LogError( ( "SecureSocketsTransport_Disconnect() failed to close the network connection. "
                             "StatusCode=%d.", ( int ) xNetworkStatus ) );
             }
+
+            /* Reset the connection flag back to false */
+            xIsConnectionEstablished = pdFALSE;
         }
 
         /* Reset SUBACK status for each topic filter after completion of subscription request cycle. */

@@ -815,6 +815,9 @@ int RunCoreHttpS3UploadDemo( bool awsIotMqttMode,
                 LogError( ( "SecureSocketsTransport_Disconnect() failed to close the network connection. "
                             "StatusCode=%d.", ( int ) xNetworkStatus ) );
             }
+
+            /* Reset the connection flag back to false */
+            xIsConnectionEstablished = pdFALSE;
         }
 
         /* Increment the demo run count. */
