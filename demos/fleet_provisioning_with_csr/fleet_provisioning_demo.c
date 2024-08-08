@@ -864,6 +864,9 @@ int RunFleetProvisioningDemo( bool awsIotMqttMode,
             LogError( ( "SecureSocketsTransport_Disconnect() failed to close the network connection. "
                         "StatusCode=%d.\n", ( int ) xNetworkStatus ) );
         }
+
+        /* Reset the connection flag back to false */
+            xIsConnectionEstablished = pdFALSE;
     }
     return ( xDemoStatus == pdPASS ) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

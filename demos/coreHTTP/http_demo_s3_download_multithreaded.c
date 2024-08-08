@@ -1059,6 +1059,9 @@ int RunCoreHttpS3DownloadMultithreadedDemo( bool awsIotMqttMode,
                             "StatusCode=%d.", ( int ) xNetworkStatus ) );
                 xDemoStatus = pdFAIL;
             }
+
+            /* Reset the connection flag back to false */
+            xIsConnectionEstablished = pdFALSE;
         }
 
         /*********** Clean up and evaluate demo iteration status. ***********/
