@@ -567,20 +567,17 @@ TransportSocketStatus_t SecureSocketsTransport_Disconnect( const NetworkContext_
             shutdownStatus = TRANSPORT_SOCKET_STATUS_SUCCESS;
         }
 
-        if(shutdownStatus == TRANSPORT_SOCKET_STATUS_SUCCESS)
-        {
-            /* Call Secure Sockets close function to close socket. */
-            transportSocketStatus = SOCKETS_Close( pSecureSocketsTransportParams->tcpSocket );
+        /* Call Secure Sockets close function to close socket. */
+        transportSocketStatus = SOCKETS_Close( pSecureSocketsTransportParams->tcpSocket );
 
-            if( transportSocketStatus != ( int32_t ) SOCKETS_ERROR_NONE )
-            {
-                LogError( ( "Failed to close connection: SOCKETS_Close call failed. transportSocketStatus %d", transportSocketStatus ) );
-                closeStatus = TRANSPORT_SOCKET_STATUS_INTERNAL_ERROR;
-            }
-            else
-            {
-                closeStatus = TRANSPORT_SOCKET_STATUS_SUCCESS;
-            }
+        if( transportSocketStatus != ( int32_t ) SOCKETS_ERROR_NONE )
+        {
+            LogError( ( "Failed to close connection: SOCKETS_Close call failed. transportSocketStatus %d", transportSocketStatus ) );
+            closeStatus = TRANSPORT_SOCKET_STATUS_INTERNAL_ERROR;
+        }
+        else
+        {
+            closeStatus = TRANSPORT_SOCKET_STATUS_SUCCESS;
         }
 
         if( ( shutdownStatus != TRANSPORT_SOCKET_STATUS_SUCCESS ) || ( closeStatus != TRANSPORT_SOCKET_STATUS_SUCCESS ) )
